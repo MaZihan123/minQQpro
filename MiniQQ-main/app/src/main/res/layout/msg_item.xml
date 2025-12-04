@@ -37,15 +37,15 @@
 
             <TextView
                 android:id="@+id/left_msg"
-                android:background="@drawable/chat_gray"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:maxEms="12"
+                android:textColor="@color/black"
                 android:maxLines="4"
+                android:maxEms="12"
                 android:maxLength="70"
-                android:layout_margin="10dp"
-                android:textColor="@color/black"/>
+                android:layout_margin="10dp" />
+
+
 
 
         </LinearLayout>
@@ -76,15 +76,15 @@
 
             <TextView
                 android:id="@+id/right_msg"
-                android:background="@drawable/chat_green"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:layout_margin="10dp"
+                android:textColor="@color/black"
                 android:maxLines="4"
                 android:maxEms="12"
                 android:maxLength="70"
-                android:textColor="@color/black"/>
+                android:layout_margin="10dp" />
+
+
 
 
 

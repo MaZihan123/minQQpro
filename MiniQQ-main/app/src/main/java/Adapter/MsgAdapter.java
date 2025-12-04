@@ -3,8 +3,12 @@ package Adapter;
 // MsgAdapter.java
 
 
+import android.content.Context;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
+import android.graphics.Paint;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -19,6 +23,10 @@ import com.example.pretend_qq.R;
 import java.util.List;
 
 import Tools.Msg;
+import Activity.WebViewActivity;
+
+import androidx.recyclerview.widget.RecyclerView;
+import java.util.Locale;
 
 public class MsgAdapter extends RecyclerView.Adapter<MsgAdapter.ViewHolder> {
 
@@ -68,32 +76,86 @@ public class MsgAdapter extends RecyclerView.Adapter<MsgAdapter.ViewHolder> {
 
     @Override
     public void onBindViewHolder(ViewHolder holder, int position){
-        //根据位置获取对应的消息对象
+        // 根据位置获取对应的消息对象
         Msg msg = mMsgList.get(position);
-        //判断消息的类型,显示或隐藏不同的文本框
-        if(msg.getType()==Msg.TYPE_RECEIVED){
+
+        // 收到的消息（左边）
+        if (msg.getType() == Msg.TYPE_RECEIVED) {
 
             holder.leftLayout.setVisibility(View.VISIBLE);
             holder.rightLayout.setVisibility(View.GONE);
-            Bitmap bitmap= BitmapFactory.decodeByteArray(friend_avatar,0,friend_avatar.length);
-            holder.left_avatar.setImageBitmap(bitmap);//左侧头像
-            holder.left_time.setText(msg.getTime());//左侧时间
-            holder.leftMsg.setText(msg.getContent());//左侧信息
-        }else if(msg.getType() == Msg.TYPE_SENT){
+
+            Bitmap bitmap = BitmapFactory.decodeByteArray(friend_avatar, 0, friend_avatar.length);
+            holder.left_avatar.setImageBitmap(bitmap);      // 左侧头像
+            holder.left_time.setText(msg.getTime());        // 左侧时间
+
+            // 左侧文本：普通文字正常显示，URL 变成蓝色可点击并用 WebView 打开
+            bindMessageText(holder.leftMsg, msg.getContent());
+
+            // 发送的消息（右边）
+        } else if (msg.getType() == Msg.TYPE_SENT) {
 
             holder.rightLayout.setVisibility(View.VISIBLE);
             holder.leftLayout.setVisibility(View.GONE);
-            Bitmap bitmap=BitmapFactory.decodeByteArray(user_avatar,0,user_avatar.length);
-            holder.right_avatar.setImageBitmap(bitmap);//右侧头像
-            holder.rightMsg.setText(msg.getContent());//右侧信息
-            holder.right_time.setText(msg.getTime());//右侧时间
+
+            Bitmap bitmap = BitmapFactory.decodeByteArray(user_avatar, 0, user_avatar.length);
+            holder.right_avatar.setImageBitmap(bitmap);     // 右侧头像
+            holder.right_time.setText(msg.getTime());       // 右侧时间
+
+            // 右侧文本同样处理
+            bindMessageText(holder.rightMsg, msg.getContent());
         }
     }
+
 
     @Override
     public int getItemCount() {
         //返回消息的数量
         return mMsgList.size();
     }
+    // 绑定消息文本：普通文字正常显示，URL 变成蓝色可点击并用 WebViewActivity 打开
+    // 把一条消息内容绑定到 TextView：如果是链接，就变蓝 + 下划线 + 点击打开 WebViewActivity
+    private void bindMessageText(TextView textView, String content) {
+        if (content == null) content = "";
+        textView.setText(content);
+
+        // 先清理复用状态
+        textView.setTextColor(android.graphics.Color.BLACK);
+        textView.setPaintFlags(textView.getPaintFlags()
+                & (~android.graphics.Paint.UNDERLINE_TEXT_FLAG));
+        textView.setOnClickListener(null);
+
+        // 如果整条就是 URL，则高亮并设置点击
+        if (isUrl(content)) {
+            textView.setTextColor(android.graphics.Color.BLUE);
+            textView.setPaintFlags(textView.getPaintFlags()
+                    | android.graphics.Paint.UNDERLINE_TEXT_FLAG);
+
+            String finalContent = content.trim();
+            textView.setOnClickListener(v -> {
+                String url = finalContent;
+                // 支持 "www.baidu.com" 这种省略协议的写法
+                if (url.startsWith("www.")) {
+                    url = "https://" + url;
+                }
+                android.content.Intent intent =
+                        new android.content.Intent(v.getContext(), Activity.WebViewActivity.class);
+                intent.putExtra("url", url);
+                v.getContext().startActivity(intent);
+            });
+        }
+    }
+
+    // 简单判断一整条消息是不是一个 URL
+    private boolean isUrl(String text) {
+        if (text == null) return false;
+        String lower = text.trim().toLowerCase();
+        return lower.startsWith("http://")
+                || lower.startsWith("https://")
+                || lower.startsWith("www.");
+    }
+
+
+
 }
 
