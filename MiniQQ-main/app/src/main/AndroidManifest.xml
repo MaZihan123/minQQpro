@@ -123,6 +123,7 @@
         <activity
             android:name="Activity.ContactsListActivity"
             android:exported="false" />
+
     </application>
 
 </manifest>

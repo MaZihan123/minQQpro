@@ -1,15 +1,21 @@
 package Activity;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
+import android.Manifest;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.BitmapDrawable;
 import android.media.Image;
 import android.net.Uri;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -25,11 +31,15 @@ import java.io.IOException;
 
 import SQLite.UserDbHelper;
 
+
 public class Revise_Avatar_Activity extends AppCompatActivity {
 
     // 定义常量
     private static final int REQUEST_CODE_VIEW = 1; //查看头像的请求码
     private static final int REQUEST_CODE_GALLERY = 2; //从相册选择的请求码
+
+    private static final int REQUEST_CODE_CAMERA = 3;    // 拍照
+    private static final int REQUEST_PERMISSION_CAMERA = 100;
 
     private byte[]main_avatar;
 
@@ -45,10 +55,22 @@ public class Revise_Avatar_Activity extends AppCompatActivity {
     private LinearLayout menu; //选择菜单
     private TextView viewAvatar; //查看头像
     private TextView selectFromGallery; //从相册选择
+    private TextView takePhoto;        // 拍照  ← 新增
     private TextView cancel; //取消
 
     //定义变量
     private Uri avatarUri; //头像的Uri
+
+    private void openCamera() {
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (intent.resolveActivity(getPackageManager()) != null) {
+            // 这里使用默认返回的缩略图就够当头像用
+            startActivityForResult(intent, REQUEST_CODE_CAMERA);
+        } else {
+            Toast.makeText(this, "没有可用的相机应用", Toast.LENGTH_SHORT).show();
+        }
+    }
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,6 +85,7 @@ public class Revise_Avatar_Activity extends AppCompatActivity {
         backIcon = findViewById(R.id.back_icon);
         avatar = findViewById(R.id.avatar);
         menu = findViewById(R.id.menu);
+        takePhoto = findViewById(R.id.take_photo);
         viewAvatar = findViewById(R.id.view_avatar);
         selectFromGallery = findViewById(R.id.select_from_gallery);
         cancel = findViewById(R.id.cancel);
@@ -122,39 +145,139 @@ public class Revise_Avatar_Activity extends AppCompatActivity {
             intent.setType("image/*"); // 设置选择的类型为图片
             startActivityForResult(intent, REQUEST_CODE_GALLERY); //启动相册,并传递请求码
         });
+        takePhoto.setOnClickListener(v -> {
+            // 先检查相机权限（Android 6.0+ 必须）
+            if (ContextCompat.checkSelfPermission(
+                    Revise_Avatar_Activity.this,
+                    Manifest.permission.CAMERA
+            ) != PackageManager.PERMISSION_GRANTED) {
+
+                ActivityCompat.requestPermissions(
+                        Revise_Avatar_Activity.this,
+                        new String[]{Manifest.permission.CAMERA},
+                        REQUEST_PERMISSION_CAMERA
+                );
+            } else {
+                openCamera();
+            }
+        });
 
         //设置取消的点击事件,隐藏选择菜单
         cancel.setOnClickListener(v -> menu.setVisibility(View.GONE));
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        //判断请求码和结果码
-        if (requestCode == REQUEST_CODE_VIEW && resultCode == RESULT_OK) {
-            //如果是从查看头像的界面返回,获取返回的数据
-            //修改完后貌似没啥用
-            boolean isChanged = data.getBooleanExtra("isChanged", false); //是否修改了头像
-            Uri newAvatarUri = data.getParcelableExtra("newAvatarUri"); //新的头像的Uri
-            if (isChanged) {
-                //如果修改了头像,更新头像的Uri和显示
-                avatarUri = newAvatarUri;
-                avatar.setImageURI(avatarUri);
-            }
-        } else if (requestCode == REQUEST_CODE_GALLERY && resultCode == RESULT_OK) {
-            //如果是从相册返回,获取选择的图片的Uri
-            Uri selectedImageUri = data.getData();
-            if (selectedImageUri != null) {
-                //如果选择了图片,更新头像的Uri和显示
-                avatarUri = selectedImageUri;
-                avatar.setImageURI(avatarUri);
-            }
-        }
-    }
+//    @Override
+//    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+//        super.onActivityResult(requestCode, resultCode, data);
+//
+//        //判断请求码和结果码
+//        if (requestCode == REQUEST_CODE_VIEW && resultCode == RESULT_OK) {
+//            //如果是从查看头像的界面返回,获取返回的数据
+//            //修改完后貌似没啥用
+//            boolean isChanged = data.getBooleanExtra("isChanged", false); //是否修改了头像
+//            Uri newAvatarUri = data.getParcelableExtra("newAvatarUri"); //新的头像的Uri
+//            if (isChanged) {
+//                //如果修改了头像,更新头像的Uri和显示
+//                avatarUri = newAvatarUri;
+//                avatar.setImageURI(avatarUri);
+//            }
+//        } else if (requestCode == REQUEST_CODE_GALLERY && resultCode == RESULT_OK) {
+//            //如果是从相册返回,获取选择的图片的Uri
+//            Uri selectedImageUri = data.getData();
+//            if (selectedImageUri != null) {
+//                //如果选择了图片,更新头像的Uri和显示
+//                avatarUri = selectedImageUri;
+//                avatar.setImageURI(avatarUri);
+//            }
+//        }
+//    }
     @Override
     public void onBackPressed(){
         //自定义返回按键
         startActivity(new Intent(this, Revise_Message_Activity.class));
     }
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_PERMISSION_CAMERA) {
+            if (grantResults.length > 0
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // 用户同意之后再打开相机
+                openCamera();
+            } else {
+                Toast.makeText(this, "未授予相机权限，无法拍照", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        // 如果不是成功结果，直接返回，避免空指针
+        if (resultCode != RESULT_OK) {
+            return;
+        }
+
+        // 1. 从“查看头像”界面返回
+        if (requestCode == REQUEST_CODE_VIEW) {
+            if (data == null) return;
+
+            // 是否修改了头像
+            boolean isChanged = data.getBooleanExtra("isChanged", false);
+            // 新的头像 Uri
+            Uri newAvatarUri = data.getParcelableExtra("newAvatarUri");
+
+            if (isChanged && newAvatarUri != null) {
+                // 更新头像 Uri 和显示
+                avatarUri = newAvatarUri;
+                avatar.setImageURI(avatarUri);
+            }
+
+            // 2. 从相册选择返回
+        } else if (requestCode == REQUEST_CODE_GALLERY) {
+            if (data == null) return;
+
+            // 选择的图片 Uri
+            Uri selectedImageUri = data.getData();
+            if (selectedImageUri != null) {
+                // 更新头像 Uri 和显示
+                avatarUri = selectedImageUri;
+                avatar.setImageURI(avatarUri);
+            }
+
+            // 3. 从相机拍照返回
+        } else if (requestCode == REQUEST_CODE_CAMERA) {
+            if (data == null) return;
+
+            // 相机返回的是一张缩略图，放在 extras 里
+            Bundle extras = data.getExtras();
+            if (extras != null) {
+                Bitmap photo = (Bitmap) extras.get("data");
+                if (photo != null) {
+                    // 直接把 Bitmap 显示到头像上
+                    avatar.setImageBitmap(photo);
+
+                    // 【可选】把这张图插入相册，生成一个 Uri，方便“查看头像”页面使用
+                    try {
+                        String uriString = MediaStore.Images.Media.insertImage(
+                                getContentResolver(),
+                                photo,
+                                "avatar_" + System.currentTimeMillis(),
+                                null
+                        );
+                        if (uriString != null) {
+                            avatarUri = Uri.parse(uriString);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+    }
+
+
+
 }
