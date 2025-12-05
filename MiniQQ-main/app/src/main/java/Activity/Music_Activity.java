@@ -1,5 +1,6 @@
 package Activity;
 
+import android.content.IntentFilter;
 import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.view.View;
@@ -8,6 +9,8 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import com.example.pretend_qq.R;
 
+import Tools.NetworkChangeReceiver;
+
 public class Music_Activity extends AppCompatActivity {
 
     private MediaPlayer mediaPlayer;  // 媒体播放器
@@ -15,6 +18,8 @@ public class Music_Activity extends AppCompatActivity {
     private Button pauseButton;       // 暂停/继续按钮
     private Button stopButton;        // 停止按钮
     private boolean isPaused = false; // 用于标记是否处于暂停状态
+
+    private NetworkChangeReceiver networkChangeReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -28,6 +33,12 @@ public class Music_Activity extends AppCompatActivity {
 
         // 初始化 MediaPlayer，设置资源为 raw 目录下的 song.mp3 文件
         mediaPlayer = MediaPlayer.create(this, R.raw.song);
+
+        //network
+        IntentFilter filter = new IntentFilter();
+        filter.addAction("android.net.conn.CONNECTIVITY_CHANGE");
+        networkChangeReceiver = new NetworkChangeReceiver();
+        registerReceiver(networkChangeReceiver, filter);
 
         // 播放按钮的点击事件
         playButton.setOnClickListener(new View.OnClickListener() {
@@ -74,6 +85,10 @@ public class Music_Activity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (networkChangeReceiver != null) {
+            unregisterReceiver(networkChangeReceiver);
+            networkChangeReceiver = null;
+        }
         // 在 Activity 销毁时释放资源
         if (mediaPlayer != null) {
             mediaPlayer.release();

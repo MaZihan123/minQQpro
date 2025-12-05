@@ -1,9 +1,13 @@
 package Activity;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
@@ -34,7 +38,8 @@ public class MainActivity_Second extends AppCompatActivity {
     private TextView message;//消息,底部
     private TextView friend;//联系人,底部
     private TextView dongtai;//动态,底部
-    private NetworkChangeReceiver networkChangeReceiver;//监听网络
+    private NetworkChangeReceiver networkChangeReceiver;//监听网络变化
+    private BroadcastReceiver forceOfflineReceiver;//监听下线
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,12 +50,13 @@ public class MainActivity_Second extends AppCompatActivity {
         // 初始化 NetworkChangeReceiver
         networkChangeReceiver = new NetworkChangeReceiver();
 
-        // 创建 IntentFilter，监听网络连接变化
-        IntentFilter filter = new IntentFilter();
-        filter.addAction("android.net.conn.CONNECTIVITY_CHANGE");
+        // ① 注册“网络变化”广播 → 交给我们刚写的 NetworkChangeReceiver
+        IntentFilter netFilter = new IntentFilter();
+        netFilter.addAction("android.net.conn.CONNECTIVITY_CHANGE");
+        registerReceiver(networkChangeReceiver, netFilter);
 
         // 注册广播接收器
-        registerReceiver(networkChangeReceiver, filter);
+        //registerReceiver(networkChangeReceiver, filter);
 
 
         /*
@@ -180,8 +186,50 @@ public class MainActivity_Second extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        // 页面销毁时，注销“网络变化”广播
+        if (networkChangeReceiver != null) {
+            unregisterReceiver(networkChangeReceiver);
+            networkChangeReceiver = null;
+        }
 
-        // 注销广播接收器
-        unregisterReceiver(networkChangeReceiver);
     }
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // ② 页面可见时，注册“强制下线”广播
+        IntentFilter forceFilter = new IntentFilter("com.example.pretend_qq.FORCE_OFFLINE");
+        forceOfflineReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                // 收到强制下线广播 → 弹出对话框
+                new AlertDialog.Builder(MainActivity_Second.this)
+                        .setTitle("下线提醒")
+                        .setMessage("当前未连接 WiFi 已超过 5 秒，已被强制下线，请重新登录。")
+                        .setCancelable(false)
+                        .setPositiveButton("确定", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                // 清空任务栈并跳转到登录界面
+                                Intent loginIntent =
+                                        new Intent(MainActivity_Second.this, LoginActivity_Second.class);
+                                loginIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                                        | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                                startActivity(loginIntent);
+                            }
+                        })
+                        .show();
+            }
+        };
+        registerReceiver(forceOfflineReceiver, forceFilter);
+    }
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // 页面不可见时，注销“强制下线”广播
+        if (forceOfflineReceiver != null) {
+            unregisterReceiver(forceOfflineReceiver);
+            forceOfflineReceiver = null;
+        }
+    }
+
 }
