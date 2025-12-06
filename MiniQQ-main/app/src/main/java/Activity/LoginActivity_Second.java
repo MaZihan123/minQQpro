@@ -27,12 +27,24 @@ import android.widget.Toast;
 
 import com.example.pretend_qq.R;
 
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 
 import SQLite.UserDbHelper;
 import Tools.UserInfo;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+
 
 public class LoginActivity_Second extends AppCompatActivity {
     private int main_qq;
@@ -55,6 +67,16 @@ public class LoginActivity_Second extends AppCompatActivity {
     private String account_text;
     private String password_text;
     private boolean password_see;
+
+    private OkHttpClient client = new OkHttpClient();
+    private static final MediaType JSON
+            = MediaType.get("application/json; charset=utf-8");
+
+    // 注意替换成你自己电脑的 IP + 端口：
+// 真机 + 同一个 WiFi -> http://192.168.xxx.xxx:5000
+// Android Studio 自带模拟器 -> http://10.0.2.2:5000
+    private static final String BASE_URL = "http://192.168.1.120:5000";
+
     @SuppressLint("MissingInflatedId")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -196,51 +218,156 @@ public class LoginActivity_Second extends AppCompatActivity {
         //进入注册界面
         register.setOnClickListener(view -> startActivity(new Intent(LoginActivity_Second.this,RegisterActivity_Second.class)));
 
-        //设置登录按钮的点击事件
         login.setOnClickListener(v -> {
-            UserInfo userInfo=null;
-            //获取用户输入的账号和密码
-            int user_qq1= Integer.parseInt(accountEdit.getText().toString());
-            String password1 = passwordEdit.getText().toString();
+            // 1. 取输入
+            String qqStr = accountEdit.getText().toString().trim();
+            String password1 = passwordEdit.getText().toString().trim();
 
-            //调用UserDbHelper的getInstance方法,传入当前上下文对象,获取UserDbHelper的单例对象
-            UserDbHelper db1 =UserDbHelper.getInstance(LoginActivity_Second.this);
+            if (TextUtils.isEmpty(qqStr) || TextUtils.isEmpty(password1)) {
+                Toast.makeText(LoginActivity_Second.this, "账号或密码不能为空", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            int user_qq1;
             try {
-                userInfo=db1.Login(user_qq1);
-            }catch (Exception e){
-                Log.d("LoginActivity_Second","db1为空!");
+                user_qq1 = Integer.parseInt(qqStr);
+            } catch (NumberFormatException e) {
+                Toast.makeText(LoginActivity_Second.this, "账号格式不正确", Toast.LENGTH_SHORT).show();
+                return;
             }
 
+            // 2. 组装 JSON 请求体
+            JSONObject json = new JSONObject();
+            try {
+                json.put("qq", user_qq1);          // 后端那边就按 qq / password 接
+                json.put("password", password1);
+            } catch (JSONException e) {
+                e.printStackTrace();
+                Toast.makeText(LoginActivity_Second.this, "本地数据异常", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
-            //如果userInfo对象不为空,说明登录成功
-            if(userInfo!=null){
-                if(password1.equals(userInfo.getPassword())){
+            RequestBody body = RequestBody.create(json.toString(), JSON);
+            Request request = new Request.Builder()
+                    .url(BASE_URL + "/api/login")
+                    .post(body)
+                    .build();
 
-                    sp=getSharedPreferences("user_data",MODE_PRIVATE);
-                    editor=sp.edit();
-                    editor.putInt("main_qq",user_qq1);
-                    editor.commit();
-                    //跳转到下一个界面
-                    Intent intent=new Intent(LoginActivity_Second.this, MainActivity_Second.class);
-                    startActivity(intent);
-
-                    Toast.makeText(LoginActivity_Second.this,"欢迎用户使用",Toast.LENGTH_SHORT).show();
-                    finish();
-
-                    //根据CheckBox状态决定是否更新数据库中的remember_password字段
-                    if(rememberPass.isChecked()){
-                        db1.updateRememberPassword(user_qq1,1);
-                    }else{
-                        db1.updateRememberPassword(user_qq1,0);
-                    }
-                }else{
-                    Toast.makeText(LoginActivity_Second.this, "账号或密码错误", Toast.LENGTH_SHORT).show();
+            // 3. 发起异步网络请求
+            client.newCall(request).enqueue(new Callback() {
+                @Override
+                public void onFailure(Call call, IOException e) {
+                    Log.e("HTTP_LOGIN", "请求失败: " + e.getMessage(), e);
+                    runOnUiThread(() ->
+                            Toast.makeText(LoginActivity_Second.this,
+                                    "网络请求失败: " + e.getMessage(),
+                                    Toast.LENGTH_SHORT).show()
+                    );
                 }
-            }else{
-                Toast.makeText(LoginActivity_Second.this,"用户名或密码不存在!",Toast.LENGTH_SHORT).show();
-            }
-            db1.close();
+
+
+                @Override
+                public void onResponse(Call call, Response response) throws IOException {
+                    if (!response.isSuccessful()) {
+                        runOnUiThread(() ->
+                                Toast.makeText(LoginActivity_Second.this, "服务器异常", Toast.LENGTH_SHORT).show()
+                        );
+                        return;
+                    }
+
+                    String respStr = response.body().string();
+                    try {
+                        JSONObject respJson = new JSONObject(respStr);
+                        int code = respJson.optInt("code", -1);
+                        String msg = respJson.optString("msg", "未知错误");
+
+                        if (code == 0) {
+                            // 登录成功
+                            runOnUiThread(() -> {
+                                // ① 保存 main_qq（沿用你原来的逻辑）
+                                sp = getSharedPreferences("user_data", MODE_PRIVATE);
+                                editor = sp.edit();
+                                editor.putInt("main_qq", user_qq1);
+                                editor.apply();
+
+                                // ② 可选：更新本地 SQLite 的 rememberPassword 字段
+                                UserDbHelper db1 = UserDbHelper.getInstance(LoginActivity_Second.this);
+                                if (rememberPass.isChecked()) {
+                                    db1.updateRememberPassword(user_qq1, 1);
+                                } else {
+                                    db1.updateRememberPassword(user_qq1, 0);
+                                }
+                                db1.close();
+
+                                // ③ 跳转主界面
+                                Intent intent = new Intent(LoginActivity_Second.this, MainActivity_Second.class);
+                                startActivity(intent);
+                                Toast.makeText(LoginActivity_Second.this, "欢迎用户使用", Toast.LENGTH_SHORT).show();
+                                finish();
+                            });
+
+                        } else {
+                            // 登录失败，提示服务器返回的 msg
+                            runOnUiThread(() ->
+                                    Toast.makeText(LoginActivity_Second.this, msg, Toast.LENGTH_SHORT).show()
+                            );
+                        }
+
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                        runOnUiThread(() ->
+                                Toast.makeText(LoginActivity_Second.this, "解析服务器数据失败", Toast.LENGTH_SHORT).show()
+                        );
+                    }
+                }
+            });
         });
+
+        //设置登录按钮的点击事件
+//        login.setOnClickListener(v -> {
+//            UserInfo userInfo=null;
+//            //获取用户输入的账号和密码
+//            int user_qq1= Integer.parseInt(accountEdit.getText().toString());
+//            String password1 = passwordEdit.getText().toString();
+//
+//            //调用UserDbHelper的getInstance方法,传入当前上下文对象,获取UserDbHelper的单例对象
+//            UserDbHelper db1 =UserDbHelper.getInstance(LoginActivity_Second.this);
+//            try {
+//                userInfo=db1.Login(user_qq1);
+//            }catch (Exception e){
+//                Log.d("LoginActivity_Second","db1为空!");
+//            }
+//
+//
+//            //如果userInfo对象不为空,说明登录成功
+//            if(userInfo!=null){
+//                if(password1.equals(userInfo.getPassword())){
+//
+//                    sp=getSharedPreferences("user_data",MODE_PRIVATE);
+//                    editor=sp.edit();
+//                    editor.putInt("main_qq",user_qq1);
+//                    editor.commit();
+//                    //跳转到下一个界面
+//                    Intent intent=new Intent(LoginActivity_Second.this, MainActivity_Second.class);
+//                    startActivity(intent);
+//
+//                    Toast.makeText(LoginActivity_Second.this,"欢迎用户使用",Toast.LENGTH_SHORT).show();
+//                    finish();
+//
+//                    //根据CheckBox状态决定是否更新数据库中的remember_password字段
+//                    if(rememberPass.isChecked()){
+//                        db1.updateRememberPassword(user_qq1,1);
+//                    }else{
+//                        db1.updateRememberPassword(user_qq1,0);
+//                    }
+//                }else{
+//                    Toast.makeText(LoginActivity_Second.this, "账号或密码错误", Toast.LENGTH_SHORT).show();
+//                }
+//            }else{
+//                Toast.makeText(LoginActivity_Second.this,"用户名或密码不存在!",Toast.LENGTH_SHORT).show();
+//            }
+//            db1.close();
+//        });
     }
     public void judge(int user_qq,String password,boolean flag){
         if(flag){

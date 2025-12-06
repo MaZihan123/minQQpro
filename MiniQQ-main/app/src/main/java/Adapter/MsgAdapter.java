@@ -27,6 +27,11 @@ import Activity.WebViewActivity;
 
 import androidx.recyclerview.widget.RecyclerView;
 import java.util.Locale;
+import android.widget.TextView;
+import androidx.core.content.ContextCompat;
+
+import Activity.DownloadService;   // 你新建的前台下载 Service（和 WebViewActivity 同一个包）
+
 
 public class MsgAdapter extends RecyclerView.Adapter<MsgAdapter.ViewHolder> {
 
@@ -125,6 +130,37 @@ public class MsgAdapter extends RecyclerView.Adapter<MsgAdapter.ViewHolder> {
                 & (~android.graphics.Paint.UNDERLINE_TEXT_FLAG));
         textView.setOnClickListener(null);
 
+        // ① 文件消息：[文件] xxx
+        if (isFileMessage(content)) {
+            textView.setTextColor(Color.BLUE);
+            textView.setPaintFlags(textView.getPaintFlags()
+                    | Paint.UNDERLINE_TEXT_FLAG);
+
+            // 从 "[文件] test.png" 切出 "test.png"
+            String fileName = content.substring("[文件]".length()).trim();
+            if (fileName.startsWith("]")) {   // 兼容你可能写成 "[文件] test.png"
+                fileName = fileName.substring(1).trim();
+            }
+
+            String finalFileName = fileName;
+            textView.setOnClickListener(v -> {
+                Context ctx = v.getContext();
+
+                // 这里是你 Flask 静态文件的访问前缀，按你服务器实际 IP 改
+                String baseUrl = "http://192.168.1.120:5000/uploads/";
+                String downloadUrl = baseUrl + finalFileName;
+
+                Intent intent = new Intent(ctx, DownloadService.class);
+                intent.putExtra("url", downloadUrl);
+                intent.putExtra("fileName", finalFileName);
+
+                // 前台服务启动（Android 8+ 推荐这样）
+                ContextCompat.startForegroundService(ctx, intent);
+            });
+
+            return; // 已经处理完“文件消息”，下面的 URL 逻辑就不用再走了
+        }
+
         // 如果整条就是 URL，则高亮并设置点击
         if (isUrl(content)) {
             textView.setTextColor(android.graphics.Color.BLUE);
@@ -145,6 +181,12 @@ public class MsgAdapter extends RecyclerView.Adapter<MsgAdapter.ViewHolder> {
             });
         }
     }
+    // 判断是不是 "[文件] xxx" 这种格式
+    private boolean isFileMessage(String text) {
+        if (text == null) return false;
+        return text.trim().startsWith("[文件]");
+    }
+
 
     // 简单判断一整条消息是不是一个 URL
     private boolean isUrl(String text) {

@@ -7,6 +7,8 @@ import android.content.ContentValues;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 
 import com.example.pretend_qq.R;
@@ -20,6 +22,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.provider.OpenableColumns;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -29,6 +32,9 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -38,6 +44,14 @@ import java.util.List;
 import Adapter.MsgAdapter;
 import SQLite.UserDbHelper;
 import Tools.Msg;
+import okhttp3.OkHttpClient;
+// OkHttp 相关
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 public class ChatActivity extends AppCompatActivity {
     private SharedPreferences sp;//获取主用户qq
@@ -50,6 +64,8 @@ public class ChatActivity extends AppCompatActivity {
     private ImageView select;//选项,进入删除/清空界面
     private EditText inputText;//输入框
     private Button send; //发送按钮
+    private Button btnSendFile; // 发送文件按钮
+
     private RecyclerView msgRecyclerView; //消息列表视图
     private MsgAdapter adapter; //消息适配器
     private int user_qq;//当前用户qq
@@ -57,6 +73,15 @@ public class ChatActivity extends AppCompatActivity {
 
     private int user_id;
     private int friend_id;
+
+
+    // 选择文件的请求码
+    private static final int REQUEST_CODE_CHOOSE_FILE = 1001;
+    // 文件上传的服务器地址（按你自己的 IP 和接口改）
+    private static final String UPLOAD_URL = "http://192.168.1.120:5000/api/upload_file";
+
+    // OkHttp 客户端（如果你项目里已经有，就不用再 new）
+    private OkHttpClient httpClient = new OkHttpClient();
 
     @SuppressLint("MissingInflatedId")
     @Override
@@ -92,6 +117,12 @@ public class ChatActivity extends AppCompatActivity {
         initMsgs();
 
         inputText = findViewById(R.id.input_text);//输入框
+
+        btnSendFile = findViewById(R.id.btn_send_file);//文件的框
+
+        btnSendFile.setOnClickListener(v -> openFileChooser());
+
+
 
         //删除/清空界面
         select.setOnClickListener(view -> {
@@ -139,11 +170,33 @@ public class ChatActivity extends AppCompatActivity {
                 db1.insert("message_table", null, values); //将values中的数据插入到message_table中
                 db1.close(); // 关闭数据库
 
+                saveMessageToDb(content, Msg.TYPE_SENT, time);
+
             }else{
                 Toast.makeText(ChatActivity.this,"发送消息不能为空!",Toast.LENGTH_SHORT).show();
             }
         });
 
+    }
+    // 打开系统文件选择器
+    private void openFileChooser() {
+        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+        intent.setType("*/*");  // 任意类型的文件
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        startActivityForResult(Intent.createChooser(intent, "选择要发送的文件"),
+                REQUEST_CODE_CHOOSE_FILE);
+    }
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == REQUEST_CODE_CHOOSE_FILE && resultCode == RESULT_OK && data != null) {
+            Uri uri = data.getData();
+            if (uri != null) {
+                // 开始后台上传文件
+                new FileUploadTask().execute(uri);
+            }
+        }
     }
     private void initMsgs() {
         // TODO: 从数据库中读取和好友的聊天记录,并添加到 msgList中
@@ -171,6 +224,137 @@ public class ChatActivity extends AppCompatActivity {
         cursor.close(); //关闭游标
         db1.close(); //关闭数据库
     }
+    private class FileUploadTask extends AsyncTask<Uri, Integer, Boolean> {
+
+        private String fileName;  // 用来在 UI 上显示
+        private String errorMsg;  // 错误信息（可选）
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            Toast.makeText(ChatActivity.this, "开始上传文件...", Toast.LENGTH_SHORT).show();
+        }
+
+        @Override
+        protected Boolean doInBackground(Uri... uris) {
+            if (uris == null || uris.length == 0) return false;
+
+            Uri fileUri = uris[0];
+
+            try {
+                // 1. 获取文件名
+                fileName = getFileNameFromUri(fileUri);
+                if (fileName == null) {
+                    fileName = "unknown_file";
+                }
+
+                // 2. 获取 MIME 类型
+                String mimeType = getContentResolver().getType(fileUri);
+                if (mimeType == null) {
+                    mimeType = "application/octet-stream";
+                }
+
+                // 3. 读取文件成字节数组（示例：小文件没问题，大文件注意内存）
+                byte[] fileBytes = readBytesFromUri(fileUri);
+
+                // 4. 构建 OkHttp 的请求体（Multipart 表单）
+                RequestBody fileBody =
+                        RequestBody.create(MediaType.parse(mimeType), fileBytes);
+
+                MultipartBody requestBody = new MultipartBody.Builder()
+                        .setType(MultipartBody.FORM)
+                        // 后端用 request.files['file'] 拿这个字段
+                        .addFormDataPart("file", fileName, fileBody)
+                        .build();
+
+                Request request = new Request.Builder()
+                        .url(UPLOAD_URL)
+                        .post(requestBody)
+                        .build();
+
+                // 5. 同步执行请求（放在 doInBackground 里不会阻塞 UI）
+                Response response = httpClient.newCall(request).execute();
+                boolean success = response.isSuccessful();
+
+                // 如果后端返回了 JSON / 文本，也可以在这里解析
+                String bodyString = response.body() != null ? response.body().string() : "";
+                response.close();
+
+                if (!success) {
+                    errorMsg = "服务器返回错误：" + response.code();
+                }
+
+                // 你也可以根据 bodyString 决定是否 success
+                return success;
+            } catch (Exception e) {
+                e.printStackTrace();
+                errorMsg = e.getMessage();
+                return false;
+            }
+        }
+
+        // 从 Uri 中读取文件名
+        private String getFileNameFromUri(Uri uri) {
+            Cursor cursor = getContentResolver().query(uri, null, null, null, null);
+            if (cursor != null) {
+                int nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (nameIndex != -1 && cursor.moveToFirst()) {
+                    String name = cursor.getString(nameIndex);
+                    cursor.close();
+                    return name;
+                }
+                cursor.close();
+            }
+            return null;
+        }
+
+        // 把 Uri 对应的文件读成字节数组
+        private byte[] readBytesFromUri(Uri uri) throws IOException {
+            InputStream inputStream = getContentResolver().openInputStream(uri);
+            if (inputStream == null) {
+                throw new IOException("无法打开文件");
+            }
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            byte[] data = new byte[4096];
+            int nRead;
+            while ((nRead = inputStream.read(data, 0, data.length)) != -1) {
+                buffer.write(data, 0, nRead);
+            }
+            inputStream.close();
+            return buffer.toByteArray();
+        }
+
+        @Override
+        protected void onPostExecute(Boolean success) {
+            super.onPostExecute(success);
+
+            if (success) {
+                Toast.makeText(ChatActivity.this,
+                        "文件上传成功：" + fileName, Toast.LENGTH_SHORT).show();
+
+                // === 关键：把“发文件”也当成一条消息插入到聊天列表中 ===
+                // 这里示例用文本形式展示文件名
+                // 如果你的 Msg 构造函数参数不一样，按你自己的定义改一下
+                String time = getNowTime();
+                String showContent = "[文件] " + fileName;
+
+                Msg msg = new Msg(showContent, Msg.TYPE_SENT, time);
+                msgList.add(msg);
+                adapter.notifyItemInserted(msgList.size() - 1);
+                msgRecyclerView.scrollToPosition(msgList.size() - 1);
+
+                //也存入 message_table，这样下次进来还能看到
+                saveMessageToDb(showContent, Msg.TYPE_SENT, time);
+
+            } else {
+                String tip = "文件上传失败";
+                if (errorMsg != null) {
+                    tip += "：" + errorMsg;
+                }
+                Toast.makeText(ChatActivity.this, tip, Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
     public String getNowTime(){
         //获取当前时间
         Calendar calendar = Calendar.getInstance (); //创建一个Calendar对象
@@ -185,4 +369,20 @@ public class ChatActivity extends AppCompatActivity {
         //自定义返回按键
         startActivity(new Intent(this, MainActivity_Second.class));
     }
+    // 保存一条消息到数据库（文字 / 文件都可以复用）
+    private void saveMessageToDb(String content, int msgType, String time) {
+        // 这里用你项目里自己的 UserDbHelper / DbHelper
+        SQLiteDatabase db = UserDbHelper.getInstance(this).getWritableDatabase();
+
+        ContentValues values = new ContentValues();
+        values.put("sender_id", user_id);      // 当前用户 id
+        values.put("receiver_id", friend_id);  // 好友 id
+        values.put("content", content);        // 消息内容，比如 "你好" 或 "[文件] test.png"
+        values.put("type", msgType);           // 1=发送，2=接收（按你自己定义）
+        values.put("time", time);              // 发送时间字符串
+
+        db.insert("message_table", null, values);
+        db.close();
+    }
+
 }

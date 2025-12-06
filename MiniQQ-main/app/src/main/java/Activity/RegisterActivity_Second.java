@@ -31,6 +31,17 @@ import java.io.IOException;
 import java.util.Random;
 
 import SQLite.UserDbHelper;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+
 
 public class RegisterActivity_Second extends AppCompatActivity {
     private UserDbHelper db;
@@ -69,6 +80,16 @@ public class RegisterActivity_Second extends AppCompatActivity {
     private String password = "";
     private String password_confirm = "";
     private SharedPreferences sp;
+
+    private OkHttpClient client = new OkHttpClient();
+    private static final MediaType JSON
+            = MediaType.get("application/json; charset=utf-8");
+
+    // 注意替换成你自己电脑的 IP + 端口：
+// 真机 + 同一个 WiFi -> http://192.168.xxx.xxx:5000
+// Android Studio 自带模拟器 -> http://10.0.2.2:5000
+    private static final String BASE_URL = "http://192.168.1.120:5000";
+
 
     @SuppressLint("MissingInflatedId")
     @Override
@@ -237,73 +258,184 @@ public class RegisterActivity_Second extends AppCompatActivity {
             else if(!password.equals(password_confirm)){
                 Toast.makeText(RegisterActivity_Second.this,"两次密码不一致!",Toast.LENGTH_SHORT).show();
             }
-            else if(!username.equals("") &&!gender.equals("")&&!city.equals("")&&!str_year.equals("")&&!str_month.equals("")&&!str_day.equals("")&&!answer1.equals("")&&!answer2.equals("")&&!password.equals("")&&!password_confirm.equals("")&&password.equals(password_confirm)){
-                if(password.length()<8)flag=true;
-                if(flag)Toast.makeText(RegisterActivity_Second.this,"密码不能少于8位!",Toast.LENGTH_SHORT).show();
-                else{
-                    int row=db.register(qq_num,password);//注册,qq和密码
-                    if(row>0){
-                        AlertDialog.Builder builder=new AlertDialog.Builder(RegisterActivity_Second.this);
-                        Toast.makeText(RegisterActivity_Second.this,"注册成功!",Toast.LENGTH_SHORT).show();
-                        builder.setTitle("请确认您的QQ号");
-                        qq_num=create_qq();
-                        builder.setMessage("您的QQ号是:"+qq_num);
-                        builder.setPositiveButton("确定", (dialogInterface, i) -> {
-                            Log.d("RegisterActivity_Second","您的QQ号是: "+qq_num);
-                            Intent intent=new Intent(RegisterActivity_Second.this,LoginActivity_Second.class);
-                            intent.putExtra("user_qq",qq_num);
-                            startActivity(intent);
-                        });
-                        builder.create().show();
-                        //获取ImageView的图片源,转换为Bitmap对象
-                        Bitmap bitmap = ((BitmapDrawable)ig_avatar.getDrawable()).getBitmap();
-                        //创建一个字节数组输出流对象,用于存储压缩后的图片
-                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                        //使用Bitmap类的compress方法,将图片压缩为JPEG格式,质量为100%,输出到字节数组输出流对象中
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, baos);
-                        //从字节数组输出流对象中获取字节数组,赋值给avatar变量
-                        avatar= baos.toByteArray();
-                        //关闭字节数组输出流对象,释放资源
-                        try{
-                            baos.close();
-                        } catch (IOException e){
-                            throw new RuntimeException(e);
-                        }
-                        db.register(qq_num,password);//注册到数据库中
-                        db.updateAvatar(qq_num,avatar);//存储头像
-                        db.updateUsername(qq_num,username);//存储用户名
-                        db.updateGender(qq_num,gender);//存储性别
-                        db.updateRegion(qq_num,city);//存储城市
-                        db.updateYear(qq_num,year);//存储年
-                        db.updateMonth(qq_num,month);//存储月
-                        db.updateDay(qq_num,day);//存储日
-                        db.updateQuestion1(qq_num,question1);//存储密钥1
-                        db.updateAnswer1(qq_num,answer1);
-                        db.updateQuestion2(qq_num,question2);//存储密钥2
-                        db.updateAnswer2(qq_num,answer2);
-                        db.close();
 
-                        UserDbHelper db1=UserDbHelper.getInstance(this);
-                        //打印测试
-                        String str_password=db1.getPassword(qq_num);
-                        String str_question1=db1.getQuestion1(qq_num);
-                        String str_answer1=db1.getAnswer1(qq_num);
-                        String str_question2=db1.getQuestion2(qq_num);
-                        String str_answer2=db1.getAnswer2(qq_num);
-                        
-                        Log.d("RegisterActivity_Second","str_password is: "+str_password);
-                        Log.d("RegisterActivity_Second","str_question1 is: "+str_question1);
-                        Log.d("RegisterActivity_Second","str_answer1 is "+str_answer1);
-                        Log.d("RegisterActivity_Second","str_question2 is: "+str_question2);
-                        Log.d("RegisterActivity_Second","str_answer2 is "+str_answer2);
-                        db1.close();
-                        flag=false;
-                    }else{
-                        Toast.makeText(RegisterActivity_Second.this,"注册失败!",Toast.LENGTH_SHORT).show();
+            else if(!username.equals("") &&!gender.equals("")&&!city.equals("")&&!str_year.equals("")&&!str_month.equals("")&&!str_day.equals("")&&!answer1.equals("")&&!answer2.equals("")&&!password.equals("")&&!password_confirm.equals("")&&password.equals(password_confirm)){
+// 前面各种校验都通过后：
+                    if (password.length() < 8) {
+                        Toast.makeText(RegisterActivity_Second.this,"密码不能少于8位!",Toast.LENGTH_SHORT).show();
+                    } else {
+
+                        // 1. 生成一个 qq 号（如果你的后端需要客户端传 qq）
+                        // 如果你改成后端生成 qq，就不要本地 create_qq() 了
+                        qq_num = create_qq();
+
+                        // 2. 准备请求 JSON
+                        JSONObject json = new JSONObject();
+                        try {
+                            json.put("qq", qq_num);
+                            json.put("password", password);
+                            json.put("username", username);   // 如果后端也想存昵称，可以一块传
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                            Toast.makeText(RegisterActivity_Second.this, "本地数据异常", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+
+                        RequestBody body = RequestBody.create(json.toString(), JSON);
+                        Request request = new Request.Builder()
+                                .url(BASE_URL + "/api/register")
+                                .post(body)
+                                .build();
+
+                        client.newCall(request).enqueue(new Callback() {
+                            @Override
+                            public void onFailure(Call call, IOException e) {
+                                Log.e("HTTP_LOGIN", "请求失败: " + e.getMessage(), e);
+                                runOnUiThread(() ->
+                                        Toast.makeText(RegisterActivity_Second.this,
+                                                "网络请求失败: " + e.getMessage(),
+                                                Toast.LENGTH_SHORT).show()
+                                );
+                            }
+
+
+                            @Override
+                            public void onResponse(Call call, Response response) throws IOException {
+                                if (!response.isSuccessful()) {
+                                    runOnUiThread(() ->
+                                            Toast.makeText(RegisterActivity_Second.this, "服务器异常", Toast.LENGTH_SHORT).show()
+                                    );
+                                    return;
+                                }
+
+                                String respStr = response.body().string();
+                                try {
+                                    JSONObject respJson = new JSONObject(respStr);
+                                    int code = respJson.optInt("code", -1);
+                                    String msg = respJson.optString("msg", "未知错误");
+
+                                    if (code == 0) {
+                                        // ✅ 后端 MySQL 注册成功 → 再把头像和资料写入本地 SQLite
+                                        runOnUiThread(() -> {
+                                            // ------- 压缩头像并写 SQLite，直接复用你原来的代码 -------
+                                            Bitmap bitmap = ((BitmapDrawable) ig_avatar.getDrawable()).getBitmap();
+                                            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                                            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, baos);
+                                            avatar = baos.toByteArray();
+                                            try { baos.close(); } catch (IOException e) { e.printStackTrace(); }
+
+                                            db.register(qq_num, password);              // 本地也留一份账号密码（仅做缓存）
+                                            db.updateAvatar(qq_num, avatar);
+                                            db.updateUsername(qq_num, username);
+                                            db.updateGender(qq_num, gender);
+                                            db.updateRegion(qq_num, city);
+                                            db.updateYear(qq_num, year);
+                                            db.updateMonth(qq_num, month);
+                                            db.updateDay(qq_num, day);
+                                            db.updateQuestion1(qq_num, question1);
+                                            db.updateAnswer1(qq_num, answer1);
+                                            db.updateQuestion2(qq_num, question2);
+                                            db.updateAnswer2(qq_num, answer2);
+                                            db.close();
+
+                                            // ------- 弹出 QQ 号提示框，跳转到登录界面 -------
+                                            AlertDialog.Builder builder = new AlertDialog.Builder(RegisterActivity_Second.this);
+                                            Toast.makeText(RegisterActivity_Second.this,"注册成功!",Toast.LENGTH_SHORT).show();
+                                            builder.setTitle("请确认您的QQ号");
+                                            builder.setMessage("您的QQ号是:" + qq_num);
+                                            builder.setPositiveButton("确定", (dialogInterface, i) -> {
+                                                Intent intent = new Intent(RegisterActivity_Second.this, LoginActivity_Second.class);
+                                                intent.putExtra("user_qq", qq_num);
+                                                startActivity(intent);
+                                            });
+                                            builder.create().show();
+                                        });
+
+                                    } else {
+                                        // 注册失败，提示后端原因（例如“QQ 已存在”）
+                                        runOnUiThread(() ->
+                                                Toast.makeText(RegisterActivity_Second.this, msg, Toast.LENGTH_SHORT).show()
+                                        );
+                                    }
+
+                                } catch (JSONException e) {
+                                    e.printStackTrace();
+                                    runOnUiThread(() ->
+                                            Toast.makeText(RegisterActivity_Second.this, "解析服务器数据失败", Toast.LENGTH_SHORT).show()
+                                    );
+                                }
+                            }
+                        });
                     }
                 }
 
-            }
+
+//                if(password.length()<8)flag=true;
+//                if(flag)Toast.makeText(RegisterActivity_Second.this,"密码不能少于8位!",Toast.LENGTH_SHORT).show();
+//                else{
+//                    int row=db.register(qq_num,password);//注册,qq和密码
+//                    if(row>0){
+//                        AlertDialog.Builder builder=new AlertDialog.Builder(RegisterActivity_Second.this);
+//                        Toast.makeText(RegisterActivity_Second.this,"注册成功!",Toast.LENGTH_SHORT).show();
+//                        builder.setTitle("请确认您的QQ号");
+//                        qq_num=create_qq();
+//                        builder.setMessage("您的QQ号是:"+qq_num);
+//                        builder.setPositiveButton("确定", (dialogInterface, i) -> {
+//                            Log.d("RegisterActivity_Second","您的QQ号是: "+qq_num);
+//                            Intent intent=new Intent(RegisterActivity_Second.this,LoginActivity_Second.class);
+//                            intent.putExtra("user_qq",qq_num);
+//                            startActivity(intent);
+//                        });
+//                        builder.create().show();
+//                        //获取ImageView的图片源,转换为Bitmap对象
+//                        Bitmap bitmap = ((BitmapDrawable)ig_avatar.getDrawable()).getBitmap();
+//                        //创建一个字节数组输出流对象,用于存储压缩后的图片
+//                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+//                        //使用Bitmap类的compress方法,将图片压缩为JPEG格式,质量为100%,输出到字节数组输出流对象中
+//                        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, baos);
+//                        //从字节数组输出流对象中获取字节数组,赋值给avatar变量
+//                        avatar= baos.toByteArray();
+//                        //关闭字节数组输出流对象,释放资源
+//                        try{
+//                            baos.close();
+//                        } catch (IOException e){
+//                            throw new RuntimeException(e);
+//                        }
+//                        db.register(qq_num,password);//注册到数据库中
+//                        db.updateAvatar(qq_num,avatar);//存储头像
+//                        db.updateUsername(qq_num,username);//存储用户名
+//                        db.updateGender(qq_num,gender);//存储性别
+//                        db.updateRegion(qq_num,city);//存储城市
+//                        db.updateYear(qq_num,year);//存储年
+//                        db.updateMonth(qq_num,month);//存储月
+//                        db.updateDay(qq_num,day);//存储日
+//                        db.updateQuestion1(qq_num,question1);//存储密钥1
+//                        db.updateAnswer1(qq_num,answer1);
+//                        db.updateQuestion2(qq_num,question2);//存储密钥2
+//                        db.updateAnswer2(qq_num,answer2);
+//                        db.close();
+//
+//                        UserDbHelper db1=UserDbHelper.getInstance(this);
+//                        //打印测试
+//                        String str_password=db1.getPassword(qq_num);
+//                        String str_question1=db1.getQuestion1(qq_num);
+//                        String str_answer1=db1.getAnswer1(qq_num);
+//                        String str_question2=db1.getQuestion2(qq_num);
+//                        String str_answer2=db1.getAnswer2(qq_num);
+//
+//                        Log.d("RegisterActivity_Second","str_password is: "+str_password);
+//                        Log.d("RegisterActivity_Second","str_question1 is: "+str_question1);
+//                        Log.d("RegisterActivity_Second","str_answer1 is "+str_answer1);
+//                        Log.d("RegisterActivity_Second","str_question2 is: "+str_question2);
+//                        Log.d("RegisterActivity_Second","str_answer2 is "+str_answer2);
+//                        db1.close();
+//                        flag=false;
+//                    }else{
+//                        Toast.makeText(RegisterActivity_Second.this,"注册失败!",Toast.LENGTH_SHORT).show();
+//                    }
+//                }
+//
+//            }
         });
 
     }
