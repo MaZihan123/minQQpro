@@ -31,6 +31,8 @@ import android.widget.TextView;
 import androidx.core.content.ContextCompat;
 
 import Activity.DownloadService;   // 你新建的前台下载 Service（和 WebViewActivity 同一个包）
+import android.text.TextUtils;
+
 
 
 public class MsgAdapter extends RecyclerView.Adapter<MsgAdapter.ViewHolder> {
@@ -151,8 +153,11 @@ public class MsgAdapter extends RecyclerView.Adapter<MsgAdapter.ViewHolder> {
                 String downloadUrl = baseUrl + finalFileName;
 
                 Intent intent = new Intent(ctx, DownloadService.class);
-                intent.putExtra("url", downloadUrl);
-                intent.putExtra("fileName", finalFileName);
+//                intent.putExtra("url", downloadUrl);
+//                intent.putExtra("fileName", finalFileName);
+                intent.putExtra(DownloadService.EXTRA_URL, downloadUrl);
+                intent.putExtra(DownloadService.EXTRA_FILE_NAME, finalFileName);
+
 
                 // 前台服务启动（Android 8+ 推荐这样）
                 ContextCompat.startForegroundService(ctx, intent);

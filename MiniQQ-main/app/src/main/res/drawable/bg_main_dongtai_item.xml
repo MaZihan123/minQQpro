@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+
+    <!-- 圆角 -->
+    <corners android:radius="12dp" />
+
+    <!-- 背景色，略微偏灰白 -->
+    <solid android:color="#FFFFFFFF" />
+
+    <!-- 轻微描边，提升质感 -->
+    <stroke
+        android:width="0.5dp"
+        android:color="#11000000" />
+
+    <!-- 内边距，防止内容贴边（这里主要用 layout 的 padding，也可以二选一） -->
+    <padding
+        android:left="4dp"
+        android:top="4dp"
+        android:right="4dp"
+        android:bottom="4dp" />
+
+</shape>

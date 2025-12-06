@@ -62,9 +62,10 @@ public class ChatActivity extends AppCompatActivity {
     private TextView friend_name;//好友名字=>标题
     private String str_friend_name;//好友名字
     private ImageView select;//选项,进入删除/清空界面
-    private EditText inputText;//输入框
-    private Button send; //发送按钮
-    private Button btnSendFile; // 发送文件按钮
+    private EditText inputText;    // 输入框还是 EditText
+    private TextView send;         // 发送按钮现在是 TextView
+    private ImageButton btnSendFile; // 文件按钮现在是 ImageButton
+
 
     private RecyclerView msgRecyclerView; //消息列表视图
     private MsgAdapter adapter; //消息适配器
@@ -136,7 +137,14 @@ public class ChatActivity extends AppCompatActivity {
 
         send =findViewById(R.id.send);
         msgRecyclerView = findViewById(R.id.msg_recycler_view);
+
+// 1. 创建 LayoutManager
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
+
+// 2. 让列表从底部开始堆叠（解决“下面一大片空白”的视觉问题）
+        //layoutManager.setStackFromEnd(true);
+
+// 3. 设置给 RecyclerView
         msgRecyclerView.setLayoutManager(layoutManager);
 
         byte[]user_avatar=db.getAvatar(user_qq);
@@ -145,6 +153,10 @@ public class ChatActivity extends AppCompatActivity {
         //初始化适配器和消息列表
         adapter = new MsgAdapter(msgList,user_avatar,friend_avatar);
         msgRecyclerView.setAdapter(adapter);
+        // 如果有历史消息，滚到最后一条
+        if (!msgList.isEmpty()) {
+            msgRecyclerView.scrollToPosition(msgList.size() - 1);
+        }
 
         send.setOnClickListener(v ->{
             String content = inputText.getText().toString();//发送的内容
@@ -357,13 +369,17 @@ public class ChatActivity extends AppCompatActivity {
     }
     public String getNowTime(){
         //获取当前时间
-        Calendar calendar = Calendar.getInstance (); //创建一个Calendar对象
-        long now = calendar.getTimeInMillis (); //获取当前的时间,以毫秒为单位
-        SimpleDateFormat format = new SimpleDateFormat("HH:mm");
-        Date date = new Date (now); //Date对象,表示当前的时间
-        String time = format.format (date); //格式化当前的时间
+        Calendar calendar = Calendar.getInstance(); //创建一个Calendar对象
+        long now = calendar.getTimeInMillis();      //获取当前的时间,以毫秒为单位
+
+        // 修改这里：带上日期
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+
+        Date date = new Date(now);                  //Date对象,表示当前的时间
+        String time = format.format(date);          //格式化当前的时间
         return time;
     }
+
     @Override
     public void onBackPressed(){
         //自定义返回按键

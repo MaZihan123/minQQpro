@@ -8,4 +8,11 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="none">#00000000</color>
+    <color name="qq_blue">#12B7F5</color>          <!-- QQ 主色 -->
+    <color name="qq_bg">#F5F6FA</color>           <!-- 整体浅灰背景 -->
+    <color name="qq_card_bg">#FFFFFFFF</color>    <!-- 卡片白底 -->
+    <color name="qq_text_main">#222222</color>    <!-- 主文字 -->
+    <color name="qq_text_sub">#999999</color>     <!-- 副文字 -->
+    <color name="qq_divider">#11000000</color>    <!-- 轻微分割线/阴影 -->
+
 </resources>

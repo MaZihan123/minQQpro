@@ -3,22 +3,25 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#00000000">
+    android:background="@color/qq_bg">
 
-    <!--标题栏-->
+    <!-- 标题栏 -->
     <RelativeLayout
         android:id="@+id/title"
         android:layout_width="match_parent"
         android:layout_height="60dp"
-        android:background="#00000000"
+        android:background="@color/qq_card_bg"
         android:padding="10dp">
 
+        <!-- 返回按钮 -->
         <ImageView
             android:id="@+id/btn_back"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
             android:src="@drawable/back1" />
 
+        <!-- 好友名称 -->
         <TextView
             android:id="@+id/friend_name"
             android:layout_width="wrap_content"
@@ -31,62 +34,28 @@
             android:textSize="20sp"
             android:textStyle="bold" />
 
+        <!-- 右上角更多按钮 -->
         <ImageView
             android:id="@+id/select"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentRight="true"
-            android:src="@mipmap/select"/>
+            android:layout_centerVertical="true"
+            android:src="@mipmap/select" />
 
     </RelativeLayout>
 
+    <!-- 聊天消息列表 -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/msg_recycler_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"/>
+        android:layout_weight="1"
+        android:padding="8dp"
+        android:clipToPadding="false" />
 
-    <!-- 底部输入区域：新增“文件”按钮 -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="5dp"
-        android:orientation="horizontal"
-        android:padding="8dp">
-
-        <!-- 新增：发送文件按钮 -->
-        <Button
-            android:id="@+id/btn_send_file"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="文件"
-            android:textColor="#000000"
-            android:textAllCaps="false"
-            android:backgroundTint="#00000000"
-            android:textSize="16sp" />
-
-        <EditText
-            android:id="@+id/input_text"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:hint="说点什么吧..."
-            android:textAllCaps="false"
-            android:maxLines="2"
-            android:gravity="left"/>
-
-        <Button
-            android:id="@+id/send"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="发送"
-            android:textColor="#000000"
-            android:textAllCaps="false"
-            android:backgroundTint="#00000000"
-            android:textSize="20sp"/>
-
-    </LinearLayout>
+    <!-- 底部输入区域：使用我们新建的 QQ 风格输入条 -->
+    <include
+        layout="@layout/layout_chat_input_bar" />
 
 </LinearLayout>

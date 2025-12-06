@@ -1,46 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- item_message.xml -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="80dp"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="horizontal"
-    android:padding="10dp">
+    android:padding="10dp"
+    android:layout_marginVertical="4dp"
+    android:layout_marginHorizontal="4dp"
+    android:background="@drawable/bg_session_item"
+    android:foreground="?attr/selectableItemBackground"
+    android:gravity="center_vertical">
 
     <de.hdodenhof.circleimageview.CircleImageView
         android:id="@+id/item_avatar"
-        android:layout_width="60dp"
-        android:layout_height="60dp"
+        android:layout_width="52dp"
+        android:layout_height="52dp"
         android:src="@mipmap/img"
-        app:civ_border_width="2dp"
+        app:civ_border_width="0dp"
         app:civ_border_color="#00000000" />
-
-
 
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
         android:orientation="vertical"
-        android:paddingLeft="10dp">
+        android:paddingLeft="10dp"
+        android:gravity="center_vertical">
 
         <TextView
             android:id="@+id/item_name"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="张三"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="@color/qq_text_main" />
 
         <TextView
             android:id="@+id/item_content"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="5dp"
+            android:layout_marginTop="4dp"
             android:ellipsize="end"
             android:maxLines="1"
             android:text="你好，这是一条消息"
-            android:textSize="16sp" />
+            android:textSize="14sp"
+            android:textColor="@color/qq_text_sub" />
     </LinearLayout>
 
     <TextView
@@ -48,7 +54,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top"
-        android:layout_marginLeft="10dp"
         android:text="20:12"
-        android:textSize="14sp" />
+        android:textSize="12sp"
+        android:textColor="@color/qq_text_sub" />
 </LinearLayout>

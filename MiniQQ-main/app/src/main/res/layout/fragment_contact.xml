@@ -5,28 +5,23 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="10dp"
-    android:background="#ffffff">
+    android:background="@color/qq_bg">
 
     <!--搜索框-->
     <androidx.appcompat.widget.SearchView
         android:id="@+id/search_view"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="36dp"
         android:iconifiedByDefault="true"
         android:queryHint="搜索联系人"
-        app:queryBackground="@android:color/transparent"
-        app:submitBackground="@android:color/transparent"
-        android:background="@drawable/border"
-        android:focusable="true"
-        android:textColorHint="#999999"
-/>
+        android:background="@drawable/bg_search_bar"
+        android:layout_marginBottom="8dp"/>
 
     <!-- 联系人列表 -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/friend_recycler_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:dividerHeight="10dp"
-        android:divider="@android:color/transparent"
-        />
+        android:paddingTop="4dp"
+        android:clipToPadding="false"/>
 </LinearLayout>
